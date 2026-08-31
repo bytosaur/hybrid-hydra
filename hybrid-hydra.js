@@ -1,6 +1,14 @@
-// licensed with CC BY-NC-SA 4.0 https://creativecommons.org/licenses/by-nc-sa/4.0/
+// GNU General Public License v3.0
+
 
 async function initHybridHydra() {
+
+
+  /// ===== Hydra-Strudel integration ===== ///
+
+  // code adapted from https://github.com/atfornes/Hydra-strudel-extension/blob/main/hydra-strudel.js
+
+
   if (window.strudel !== undefined) {
     return;
   }
@@ -53,6 +61,9 @@ async function initHybridHydra() {
   };
 
   console.log("Strudel loaded!");
+
+
+  /// ===== End of Hydra-Strudel integration ===== ///
 
   /*
 
@@ -250,61 +261,6 @@ setFunction({
 `,
 });
 
-  setFunction({
-    name: "siqr",
-    type: "src",
-    inputs: [
-      {
-        type: "float",
-        name: "frequency",
-        default: 60,
-      },
-      {
-        type: "float",
-        name: "amp",
-        default: 1.0,
-      },
-      {
-        type: "float",
-        name: "sqr",
-        default: 1.0,
-      },
-      {
-        type: "float",
-        name: "sync",
-        default: 0.1,
-      },
-      {
-        type: "float",
-        name: "offset",
-        default: 0,
-      },
-    ],
-    glsl: `   vec2 st = _st;
-       float r = amp * (max(-1.0, min(1.0, exp(sqr) * (sin((st.y-offset/frequency+time*sync)*frequency))))*0.5+0.5);
-       float g = amp * (max(-1.0, min(1.0, exp(sqr) * (sin((st.y+time*sync)*frequency))))*0.5+0.5);
-       float b = amp * (max(-1.0, min(1.0, exp(sqr) * (sin((st.y+offset/frequency+time*sync)*frequency))))*0.5+0.5);
-       return vec4(r, g, b, 1.0);`,
-  });
-
-  setFunction({
-    name: "noise",
-    type: "src",
-    inputs: [
-      {
-        type: "float",
-        name: "scale",
-        default: 10,
-      },
-      {
-        type: "float",
-        name: "offset",
-        default: 0.1,
-      },
-    ],
-    glsl: `   return vec4(vec3(_noise(vec3(_st*scale, offset*time))), 1.0);`,
-  });
-
   /*
 
   Drums
@@ -340,6 +296,49 @@ setFunction({
       float r = sqrt(line)*( cos(line*20.0*_st.y));
       return vec4(r, r, r, 1.0);`,
   });
+
+
+
+  /* 
+
+  Blending
+
+  */
+
+  // hydra's substract function substract the alpha channel as well, which is not always desired. 
+  // This function only substracts the rgb channels and keeps the alpha channel of the first input.
+  setFunction({
+    name: "sub2",
+    type: "combine",
+    inputs: [
+      {
+        type: "float",
+        name: "amount",
+        default: 1,
+      },
+    ],
+    glsl: `   return vec4(_c0.rgb-_c1.rgb, _c0.a);`,
+  });
+
+
+  // noWrap scrolling, useful for scrolling textures that are not meant to wrap around
+  setFunction({
+    name: "scrollNoWrap",
+    type: "coord",
+    inputs: [
+        {
+            type: "float",
+            name: "scrollX",
+            default: 0.5,
+        },
+        {
+            type: "float",
+            name: "speed",
+            default: 0,
+        },
+    ],
+    glsl: `_st.x += scrollX + time*speed; return _st;`,
+  }); 
 
   /* 
 
@@ -439,26 +438,11 @@ setFunction({
     float y = st.y;
     float s = clamp(steepness, 1.0, 100.0);
     float m = clamp(margin, 0.0, 0.49);
-    
     float bottom = 1.0 / (1.0 + exp(-s * (y - m)));
     float top = 1.0 / (1.0 + exp(s * (y - (1.0 - m))));
     float w = bottom * top;
-    
     float win = mix(1.0, w, amount);
     return vec4(vec3(win), 1.0);
   `,
-  });
-
-  setFunction({
-    name: "sub2",
-    type: "combine",
-    inputs: [
-      {
-        type: "float",
-        name: "amount",
-        default: 1,
-      },
-    ],
-    glsl: `   return vec4(_c0.rgb-_c1.rgb, _c0.a);`,
   });
 }
