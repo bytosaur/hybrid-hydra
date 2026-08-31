@@ -212,37 +212,43 @@ async function initHybridHydra() {
 
   */
 
-  setFunction({
-    name: "sine",
-    type: "src",
-    inputs: [
-      {
-        type: "float",
-        name: "frequency",
-        default: 60,
-      },
-    ],
-    glsl: `
-       float TAU = 6.28318530718;
-       float r = -cos(_st.y*frequency*TAU);
-       return vec4(r, r, r, 1.0);`,
-  });
+setFunction({
+  name: "vco",
+  type: "src",
+  inputs: [{ type: "float", name: "numPeriods", default: 60 }],
+  glsl: `
+      float TAU = 6.28318530718;
+      float s = -cos(_st.y * numPeriods * TAU);
+      return vec4(s, s, s, 1.0);`,
+});
 
-  setFunction({
-    name: "phaseLockedSine",
-    type: "src",
-    inputs: [
-      { name: "freq", type: "float", default: 30.0 },
-      { name: "fps", type: "float", default: 60.0 },
-    ],
-    glsl: `
-  float TAU = 6.28318530718;
-  float k = floor(time * fps);
-  float tSample = (k + _st.y) / fps;
-  float s = -cos(TAU * freq * tSample);
-  return vec4(s, s, s, 1.0);
+setFunction({
+  name: "vcoComp",
+  type: "src",
+  inputs: [{ type: "float", name: "numPeriods", default: 60 }],
+  glsl: `
+    float TAU = 6.28318530718;
+    float yComp = _st.y * (1080.0/1125.0); 
+    float s = -cos(yComp * numPeriods * TAU);
+    return vec4(s, s, s, 1.0); `,
+});
+
+setFunction({
+  name: "phaseLockedvco",
+  type: "src",
+  inputs: [
+    { name: "freq", type: "float", default: 30.0 },
+    { name: "fps", type: "float", default: 60.0 },
+  ],
+  glsl: `
+    float TAU = 6.28318530718;
+    float yComp = _st.y * (1080.0/1125.0); 
+    float k = floor(time * fps);
+    float tSample = (k + yComp) / fps;
+    float s = -cos(TAU * freq * tSample);
+    return vec4(s, s, s, 1.0);
 `,
-  });
+});
 
   setFunction({
     name: "siqr",
