@@ -4,9 +4,9 @@
 
 ## Requirements
 
-- VGA to Minijack converter
+- [VGA to Minijack converter](https://github.com/eternalmachine/VGA-Audio-Breakout)
 - Go Fullscreen
-- hide code on the VGA signal (overlay code for perforamnces)
+- hide code on the VGA signal (overlay code for performances)
 
 ## Usage
 

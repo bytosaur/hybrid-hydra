@@ -1,4 +1,4 @@
-// Amplitude modulation
+// Phase modulation
 
 
 hush()
