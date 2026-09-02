@@ -1,8 +1,11 @@
-# Hybrid Hydra - material for the ICLC paper (under developed)
+# Hybrid Hydra: audio-visual alignment with mixed signals [ICLC2027]
 
-## Provide performance example
+This repository includes the source code for the framework, scripts for plots,  example code and audio-visual recordings to accompany the paper.  
 
-## Requirements
+![](images/combined_grid.png)
+
+
+## Quick Start
 
 - [VGA to Minijack converter](https://github.com/eternalmachine/VGA-Audio-Breakout)
 - Go Fullscreen
