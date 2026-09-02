@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Hydra + Audio Editor</title>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/hydra-synth/dist/hydra-synth.js"></script>
+    <!-- <link rel="stylesheet" href="sources/codemirror.min.css" /> -->
+    <!-- <link rel="stylesheet" href="sources/monokai.min.css" /> -->
+    <!-- <script src="sources/codemirror.min.js"></script> -->
+    <!-- <script src="sources/mode.codemirror.min.js"></script> -->
+     <!-- include code mirror from web -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css" />
+    <script src="src/utils.js"></script>
+    <script src="src/sync.js"></script>
+    <script src="main.js"></script>
+    <link rel="stylesheet" href="src/style.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  </head>
+  <body>
+  <!-- <div id="sync-indicator">⟲ SYNC</div> -->
+    <canvas id="analyser"></canvas>
+    <canvas id="hydra-div"></canvas>
+    <div id="editor-container"></div>
+    <div id="error"></div>
+  </body>
+  <script>
+
+    // Configuration
+    const config = {
+      panels: 1,
+      showVisualizer: false,
+      executeLocally: true,             // Execute code locally when Ctrl/Cmd+Enter is pressed
+      sync: {
+        enabled: true,                 // Enable/disable WebSocket connection entirely
+        wsUrl: 'ws://localhost:8080',   // WebSocket server URL
+        room: 'default-room',           // Room/session identifier
+        sendChanges: true,              // Send editor changes
+        receiveChanges: false,          // Receive editor changes
+        sendExecutions: true,           // Send code executions
+        receiveExecutions: false        // Receive code executions
+      }
+    };
+
+    // const config = {
+    //   panels: 2,
+    //   showVisualizer: true,
+    //   executeLocally: true,              // Execute code locally when Ctrl/Cmd+Enter is pressed
+    //   sync: {
+    //     enabled: true,                  // Enable/disable WebSocket connection entirely
+    //     wsUrl: 'ws://localhost:8080',  // WebSocket server URL
+    //     room: 'default-room',           // Room/session identifier
+    //     sendChanges: false,              // Send editor changes
+    //     receiveChanges: true,           // Receive editor changes
+    //     sendExecutions: false,           // Send code executions
+    //     receiveExecutions: true         // Receive code executions
+    //   }
+    // };
+
+    // Variables & Constants
+    const hydra = new Hydra({
+      canvas: document.getElementById("hydra-div"),
+      width: 1920,
+      height: 1080,
+      numSources: 4, // number of source buffers to create initially
+      numOutputs: 4, // number of output buffers to use. Note: untested with numbers other than 4. render() method might behave unpredictably
+      precision: null,  // force precision of shaders, can be 'highp', 'mediump', or 'lowp' (recommended for ios). When no precision is specified, will use highp for ios, and mediump for everything else.
+    });
+
+    // Helper function to find code blocks
+    function findBlocks(lines) {
+      const blocks = [];
+      let currentBlock = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() !== "") {
+          if (!currentBlock) {
+            currentBlock = { start: i, end: i, code: lines[i] };
+          } else {
+            currentBlock.end = i;
+            currentBlock.code += "\n" + lines[i];
+          }
+        } else {
+          if (currentBlock) {
+            blocks.push(currentBlock);
+            currentBlock = null;
+          }
+        }
+      }
+
+      if (currentBlock) blocks.push(currentBlock);
+      return blocks;
+    }
+
+    // Toggle comment function for JavaScript
+    function toggleComment(cm) {
+      const from = cm.getCursor("start");
+      const to = cm.getCursor("end");
+      const startLine = Math.min(from.line, to.line);
+      const endLine = Math.max(from.line, to.line);
+      
+      // Check if all lines are commented
+      let allCommented = true;
+      for (let i = startLine; i <= endLine; i++) {
+        const line = cm.getLine(i);
+        if (line.trim() && !line.trim().startsWith('//')) {
+          allCommented = false;
+          break;
+        }
+      }
+      
+      // Toggle comments
+      for (let i = startLine; i <= endLine; i++) {
+        const line = cm.getLine(i);
+        if (allCommented) {
+          // Uncomment: remove '//' and following space if present
+          const uncommented = line.replace(/^(\s*)\/\/\s?/, '$1');
+          cm.replaceRange(uncommented, { line: i, ch: 0 }, { line: i, ch: line.length });
+        } else {
+          // Comment: add '//' at the start (after leading whitespace)
+          const match = line.match(/^(\s*)/);
+          const indent = match ? match[1] : '';
+          const commented = indent + '// ' + line.slice(indent.length);
+          cm.replaceRange(commented, { line: i, ch: 0 }, { line: i, ch: line.length });
+        }
+      }
+    }
+
+    // Editor Management
+    let editors = [];
+    
+    // Initialize sync manager
+    let syncManager = null;
+
+    function createEditor(initialCode = '') {
+      // Create editor panel wrapper
+      const panel = document.createElement('div');
+      panel.className = 'editor-panel';
+      
+      // Create editor container div
+      const editorDiv = document.createElement('div');
+      editorDiv.className = 'editor-content';
+      panel.appendChild(editorDiv);
+      
+      document.getElementById('editor-container').appendChild(panel);
+      
+      // Get the index for this editor
+      const editorIndex = editors.length;
+      
+      // Initialize CodeMirror
+      const editor = CodeMirror(editorDiv, {
+        mode: "javascript",
+        theme: "monokai",
+        value: initialCode,
+        extraKeys: {
+          "Ctrl-Enter": function(cm) { evalBlock(cm, editorIndex); },
+          "Cmd-Enter": function(cm) { evalBlock(cm, editorIndex); },
+          "Alt-Enter": function(cm) { evalBlock(cm, editorIndex); },
+          "Ctrl-/": function(cm) { toggleComment(cm); },
+          "Cmd-/": function(cm) { toggleComment(cm); },
+        },
+      });
+      
+      // Track focus
+      editor.on('focus', () => {
+        document.querySelectorAll('.editor-panel').forEach(p => p.classList.remove('focused'));
+        panel.classList.add('focused');
+      });
+      
+      // Broadcast changes to other instances
+      editor.on('change', () => {
+        if (syncManager && !syncManager.isApplying() && config.sync.sendChanges) {
+          syncManager.sendMessage({
+            type: 'change',
+            editorIndex: editorIndex,
+            content: editor.getValue()
+          });
+        }
+      });
+      
+      // Store editor reference
+      editors.push({ editor, panel });
+      
+      return editor;
+    }
+
+    // Toggle visibility function
+    function toggleCodeVisibility(cm) {
+      const editorContainer = document.getElementById('editor-container');
+      if (editorContainer.style.display === 'none') {
+        editorContainer.style.display = 'flex';
+      } else {
+        editorContainer.style.display = 'none';
+      }
+    }
+
+    // Global keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Toggle code visibility with Ctrl/Cmd + H
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        toggleCodeVisibility();
+      }
+      
+      // Fullscreen toggle
+      if (e.code === 'KeyF' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        } else {
+          document.exitFullscreen();
+        }
+      }
+    });
+
+function hyeval(arg) {
+  // Wrap the code string in an async IIFE to permit 'await'
+  const asyncWrappedCode = `(async () => { ${arg} })()`;
+
+  try {
+    // eval returns a Promise now, so handle async rejections here
+    window.eval(asyncWrappedCode).catch((err) => {
+      displayEvalError(err);
+    });
+  } catch (err) {
+    // This catches synchronous syntax errors (e.g., misspelled tokens)
+    displayEvalError(err);
+  }
+}
+
+// Helper to keep your error UI logic clean
+function displayEvalError(err) {
+  const errorDiv = document.getElementById("error");
+  errorDiv.innerHTML = `<div class="error-message">Error: ${err.message}</div>`;
+  setTimeout(() => {
+    errorDiv.innerHTML = "";
+  }, 3000);
+  console.error("Hydra Evaluation error:", err);
+}
+
+
+    function evalBlock(editor, editorIndex) {
+      const code = editor.getValue();
+      const cursor = editor.getCursor();
+      const currentLine = cursor.line;
+      // Clear previous marks if any
+      if (window.currentBlockMark) {
+        window.currentBlockMark.clear();
+      }
+
+      // Split code into blocks separated by empty lines
+      const lines = code.split("\n");
+      const blocks = findBlocks(lines);
+
+      // Find the current code block
+      const targetBlock = blocks.find(
+        (block) => block.start <= currentLine && currentLine <= block.end
+      );
+
+      if (targetBlock) {
+        try {
+          // Add highlight before execution
+          window.currentBlockMark = editor.markText(
+            { line: targetBlock.start, ch: 0 },
+            { line: targetBlock.end, ch: 1000000 }, // Large number to cover line end
+            {
+              className: "executed-block-highlight",
+              css: config.executeLocally 
+                ? "background-color: rgba(255, 255, 255, 1); transition: background-color 0.2s;"
+                : "background-color: rgba(255, 150, 0, 0.5); transition: background-color 0.2s;",
+            }
+          );
+          // Remove highlight after 100ms
+          setTimeout(() => {
+            if (window.currentBlockMark) {
+              window.currentBlockMark.clear();
+              window.currentBlockMark = null;
+            }
+          }, 100);
+
+          // Execute code locally only if executeLocally is true
+          if (config.executeLocally) {
+            hyeval(targetBlock.code);
+          }
+          
+          // Broadcast execution to other instances
+          if (syncManager && !syncManager.isApplying() && config.sync.sendExecutions && editorIndex !== undefined) {
+            syncManager.sendMessage({
+              type: 'execute',
+              editorIndex: editorIndex,
+              code: targetBlock.code,
+              cursorLine: currentLine
+            });
+          }
+        } catch (error) {
+          console.error("Evaluation error:", error);
+        }
+      }
+    }
+
+    function evalCode(editor) {
+      const code = editor.getValue();
+      try {
+        // Add highlight before execution
+        window.currentBlockMark = editor.markText(
+          { line: 0, ch: 0 },
+          { line: 1000000, ch: 1000000 }, // Large number to cover line end
+          {
+            className: "executed-block-highlight",
+            css: "background-color: rgba(255, 255, 255, 1); transition: background-color 0.2s;",
+          }
+        );
+
+        // Execute code
+        hyeval(code);
+
+        // Remove highlight after 1 second
+        setTimeout(() => {
+          if (window.currentBlockMark) {
+            window.currentBlockMark.clear();
+            window.currentBlockMark = null;
+          }
+        }, 100);
+      } catch (error) {
+        console.error("Evaluation error:", error);
+      }
+    }
+
+    // initStrudel({
+    //     prebake: () => samples('github:tidalcycles/dirt-samples'),
+    //   });
+
+    // Initial values
+
+let hydraCode=`
+await initHybridHydra()
+
+t1 = track("<.4 0 .3 0>", 0.95);
+t2 = track("<1 [.8 .4 .8] .10 .2 .51>", 0.9);
+t3 = track("<200 100 300 400>", 0.9);
+solid(0,0,0,0)
+.add(acht(t1))
+.modulate(cos(t3).amp(t2))
+.amp(0.5).brightness(0.5)
+.out()
+`
+
+    // Initialize sync manager
+    syncManager = new SyncManager(config, editors, findBlocks, hyeval);
+    syncManager.connect();
+
+    // Initialize panels based on config
+    const defaultCodes = [hydraCode];
+    for (let i = 0; i < config.panels; i++) {
+      createEditor(defaultCodes[i] || '// Editor ' + (i + 1) + '\n');
+    }
+    // add a max-width of 1/n percent to the editor panels based on the number of panels
+    const editorPanels = document.querySelectorAll('.editor-panel');
+    editorPanels.forEach(panel => {
+      panel.style.maxWidth = (100 / config.panels) + '%';
+    });
+
+    setResolution(1920,1080)
+  </script>
+</html>

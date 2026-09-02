@@ -7,7 +7,7 @@ This repository includes the source code for the framework, scripts for plots,  
 
 ## Quick Start
 
-- [VGA to Minijack converter](https://github.com/eternalmachine/VGA-Audio-Breakout)
+- Build the[VGA to Minijack converter](https://theblacksea.space/code-circuits/v2a-amp/): [github](https://github.com/eternalmachine/VGA-Audio-Breakout)
 - Go Fullscreen
 - hide code on the VGA signal (overlay code for performances)
 
@@ -20,7 +20,7 @@ await loadScript("https://cdn.jsdelivr.net/gh/bytosaur/hybrid-hydra@main/hybrid-
 
 await initHybridHydra()
 
-sine(10)
+cos(10)
 .modulate(sine(2))
 .out()
 ```
