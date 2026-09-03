@@ -64,7 +64,7 @@ We have to serve a WebSocket Server that connects the individual clients with ea
 
 __Note:__ This requires Node to be installed
 
-#### installation
+#### Installation
 ```sh
 cd editor
 npm install
@@ -102,13 +102,13 @@ const config = {
     panels: 1,
     executeLocally: true, // Execute code locally when Ctrl/Cmd+Enter is pressed
     sync: {
-    enabled: true, // Enable/disable WebSocket connection entirely
-    wsUrl: "ws://localhost:8080", // WebSocket server URL
-    room: "default-room", // Room/session identifier
-    sendChanges: true, // Send editor changes
-    receiveChanges: false, // Receive editor changes
-    sendExecutions: true, // Send code executions
-    receiveExecutions: false, // Receive code executions
+        enabled: true, // Enable/disable WebSocket connection entirely
+        wsUrl: "ws://localhost:8080", // WebSocket server URL
+        room: "default-room", // Room/session identifier
+        sendChanges: true, // Send editor changes
+        receiveChanges: false, // Receive editor changes
+        sendExecutions: true, // Send code executions
+        receiveExecutions: false, // Receive code executions
     },
 };
 
