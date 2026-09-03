@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Hydra + Audio Editor</title>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/hydra-synth/dist/hydra-synth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/javascript/javascript.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css"
+    />
+    <script src="editor/src/utils.js"></script>
+    <script src="editor/src/sync.js"></script>
+    <script src="editor/main.js"></script>
+    <link rel="stylesheet" href="editor/src/style.css" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+  </head>
+  <body>
+    <!-- <div id="sync-indicator">⟲ SYNC</div> -->
+    <canvas id="analyser"></canvas>
+    <canvas id="hydra-div"></canvas>
+    <div id="editor-container"></div>
+    <div id="error"></div>
+  </body>
+  <script>
+
+    // Client Configuration
+    const config = {
+      panels: 1,
+      executeLocally: true, // Execute code locally when Ctrl/Cmd+Enter is pressed
+      sync: {
+        enabled: true, // Enable/disable WebSocket connection entirely
+        wsUrl: "ws://localhost:8080", // WebSocket server URL
+        room: "default-room", // Room/session identifier
+        sendChanges: true, // Send editor changes
+        receiveChanges: false, // Receive editor changes
+        sendExecutions: true, // Send code executions
+        receiveExecutions: false, // Receive code executions
+      },
+    };
+
+    // Receiver Configuration
+    // const config = {
+    //   panels: 2,
+    //   executeLocally: true,             // Execute code locally when Ctrl/Cmd+Enter is pressed
+    //   sync: {
+    //     enabled: true,                  // Enable/disable WebSocket connection entirely
+    //     wsUrl: 'ws://localhost:8080',   // WebSocket server URL
+    //     room: 'default-room',           // Room/session identifier
+    //     sendChanges: false,             // Send editor changes
+    //     receiveChanges: true,           // Receive editor changes
+    //     sendExecutions: false,          // Send code executions
+    //     receiveExecutions: true         // Receive code executions
+    //   }
+    // };
+
+    // Variables & Constants
+    const hydra = new Hydra({
+      canvas: document.getElementById("hydra-div"),
+      width: 1920,
+      height: 1080,
+      numSources: 4, // number of source buffers to create initially
+      numOutputs: 4, // number of output buffers to use. Note: untested with numbers other than 4. render() method might behave unpredictably
+      precision: null, // force precision of shaders, can be 'highp', 'mediump', or 'lowp' (recommended for ios). When no precision is specified, will use highp for ios, and mediump for everything else.
+    });
+
+    let hydraCode = `
+    await initHybridHydra()
+
+    t1 = track("<.4 0 .3 0>", 0.95);
+    t2 = track("<1 [.8 .4 .8] .10 .2 .51>", 0.9);
+    t3 = track("<200 100 300 400>", 0.9);
+    solid(0,0,0,0)
+    .add(acht(t1))
+    .modulate(cos(t3).amp(t2))
+    .amp(0.5).brightness(0.5)
+    .out()
+    `;
+
+    // Initialize sync manager
+    syncManager = new SyncManager(config, editors, findBlocks, hyeval);
+    syncManager.connect();
+
+    // Initialize panels based on config
+    const defaultCodes = [hydraCode];
+    for (let i = 0; i < config.panels; i++) {
+      createEditor(defaultCodes[i] || "// Editor " + (i + 1) + "\n");
+    }
+    // add a max-width of 1/n percent to the editor panels based on the number of panels
+    const editorPanels = document.querySelectorAll(".editor-panel");
+    editorPanels.forEach((panel) => {
+      panel.style.maxWidth = 100 / config.panels + "%";
+    });
+  </script>
+</html>
