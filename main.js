@@ -1,177 +1,13 @@
 // GNU General Public License v3.0
 
 async function initHybridHydra() {
-  /// ===== Hydra-Strudel integration ===== ///
 
-  // code adapted from https://github.com/atfornes/Hydra-strudel-extension/blob/main/hydra-strudel.js
-
-  if (window.strudel !== undefined) {
-    return;
-  }
-  // to avoid multiple calls
-  window.strudel = "";
-  const hydraHush = hush;
-  const strudel = await import("https://cdn.skypack.dev/@strudel.cycles/core");
-  const webaudio =
-    await import("https://cdn.skypack.dev/@strudel.cycles/webaudio");
-  const mini = await import("https://cdn.skypack.dev/@strudel.cycles/mini");
-  const { evalScope } = strudel;
-  const { webaudioScheduler } = webaudio;
-  const { miniAllStrings } = mini;
-  //initAudioOnFirstClick();
-  miniAllStrings();
-  const loadModules = evalScope(evalScope, strudel, mini, webaudio);
-  await Promise.all([loadModules]);
-  const scheduler = webaudioScheduler();
-
-  Pattern.prototype["value"] = function () {
-    const t = scheduler.now();
-    return this.query(new strudel.State(new strudel.TimeSpan(t, t)))[0].value;
-  };
-
-  shush = () => scheduler?.stop();
-
-  hush = hydraHush;
-
-  document.addEventListener("keydown", function (event) {
-    if (event.ctrlKey && event.key === ".") {
-      shush();
-    }
-  });
-
-  // enabling to use pattern functions to stringsm converting them to Patterns:
-  // "10 20".slow(2)
-  //  is the same as:
-  //  mini("10 20").slow(2)
-  Object.setPrototypeOf(String.prototype, Pattern.prototype);
-
-  // function to use inside hydra code, syntax sugar of:
-  // () => pattern.value(); // for Patterns
-  // () => window.mini(pattern).value(); // for strings that have not been converted to Patterns
-  window.P = (pattern) => {
-    if (pattern instanceof Pattern) {
-      return () => pattern.value();
-    } else {
-      return () => window.mini(pattern).value();
-    }
-  };
-
-  console.log("Strudel loaded!");
-
-  /// ===== End of Hydra-Strudel integration ===== ///
-
-  /*
-
-  SEQUENCER
-
-  */
-
-  window.activeTrackers = new Set();
-
-  // Automatically unregister track objects when GC cleans them up
-  const trackerRegistry = new FinalizationRegistry((ref) => {
-    window.activeTrackers.delete(ref);
-  });
-
-  // Factory Function: track(sequenceCallback, attackSec, minLengthSec, decaySec)
-  window.track = (
-    sequenceCallback,
-    attackSec = 0,
-    minLengthSec = 2,
-    decaySec = 0.01,
-  ) => {
-    let noteStartTime = -Infinity;
-    let activeNoteVal = 0;
-    let prevRawVal = 0;
-    let amp = 0;
-
-    // The callable function returned to Hydra
-    const trackerFunc = () => amp;
-
-    trackerFunc.update = (dtSec) => {
-      const now = performance.now() / 1000;
-
-      const currentPattern = P(sequenceCallback);
-      const rawVal =
-        typeof currentPattern === "function"
-          ? currentPattern()
-          : currentPattern;
-
-      const isNewNote =
-        rawVal > 0 &&
-        (rawVal !== prevRawVal ||
-          (currentPattern.query && currentPattern.query().length > 0));
-
-      if (isNewNote) {
-        noteStartTime = now;
-        activeNoteVal = rawVal;
-        amp = attackSec > 0 ? 0 : activeNoteVal;
-      }
-      prevRawVal = rawVal;
-
-      const elapsed = now - noteStartTime;
-      const isHoldPhase = elapsed < minLengthSec;
-
-      if (elapsed < attackSec && attackSec > 0) {
-        amp = Math.min(activeNoteVal, (elapsed / attackSec) * activeNoteVal);
-      } else if (isHoldPhase) {
-        amp = activeNoteVal;
-      } else {
-        const safeDecaySec = Math.max(0.001, decaySec);
-        amp *= Math.exp((-6.91 * dtSec) / safeDecaySec);
-      }
-    };
-
-    // Register a weak reference to this tracker instance
-    const weakRef = new WeakRef(trackerFunc);
-    window.activeTrackers.add(weakRef);
-    trackerRegistry.register(trackerFunc, weakRef);
-
-    return trackerFunc;
-  };
-  // 2. Tracker Step Engine
-  let lastFrameTime = performance.now() / 1000;
-
-  window.stepTrackers = () => {
-    const now = performance.now() / 1000;
-    const dtSec = now - lastFrameTime;
-    lastFrameTime = now;
-
-    window.activeTrackers.forEach((ref) => {
-      const tracker = ref.deref();
-      if (tracker) {
-        tracker.update(dtSec);
-      } else {
-        window.activeTrackers.delete(ref);
-      }
-    });
-  };
-
-  // 3. Transparent Update Override Interceptor
-  let userDefinedUpdate = () => {};
-
-  Object.defineProperty(window, "update", {
-    configurable: true,
-    enumerable: true,
-    get() {
-      return () => {
-        userDefinedUpdate(); // Run custom code defined in Hydra
-        stepTrackers(); // Run tracker step engine automatically
-      };
-    },
-    set(fn) {
-      if (typeof fn === "function") {
-        userDefinedUpdate = fn;
-      }
-    },
-  });
 
   /* 
 
   OPERATORS
 
   /*
-
 
 
   /*
@@ -416,4 +252,172 @@ async function initHybridHydra() {
     float r = fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
     return vec4(r, r, r, 1.0);`,
   });
+
+
+  /// ===== Hydra-Strudel integration ===== ///
+
+  // code adapted from https://github.com/atfornes/Hydra-strudel-extension/blob/main/hydra-strudel.js
+
+  if (window.strudel !== undefined) {
+    return;
+  }
+  // to avoid multiple calls
+  window.strudel = "";
+  const hydraHush = hush;
+  const strudel = await import("https://cdn.skypack.dev/@strudel.cycles/core");
+  const webaudio =
+    await import("https://cdn.skypack.dev/@strudel.cycles/webaudio");
+  const mini = await import("https://cdn.skypack.dev/@strudel.cycles/mini");
+  const { evalScope } = strudel;
+  const { webaudioScheduler } = webaudio;
+  const { miniAllStrings } = mini;
+  //initAudioOnFirstClick();
+  miniAllStrings();
+  const loadModules = evalScope(evalScope, strudel, mini, webaudio);
+  await Promise.all([loadModules]);
+  const scheduler = webaudioScheduler();
+
+  Pattern.prototype["value"] = function () {
+    const t = scheduler.now();
+    return this.query(new strudel.State(new strudel.TimeSpan(t, t)))[0].value;
+  };
+
+  shush = () => scheduler?.stop();
+
+  hush = hydraHush;
+
+  document.addEventListener("keydown", function (event) {
+    if (event.ctrlKey && event.key === ".") {
+      shush();
+    }
+  });
+
+  // enabling to use pattern functions to stringsm converting them to Patterns:
+  // "10 20".slow(2)
+  //  is the same as:
+  //  mini("10 20").slow(2)
+  Object.setPrototypeOf(String.prototype, Pattern.prototype);
+
+  // function to use inside hydra code, syntax sugar of:
+  // () => pattern.value(); // for Patterns
+  // () => window.mini(pattern).value(); // for strings that have not been converted to Patterns
+  window.P = (pattern) => {
+    if (pattern instanceof Pattern) {
+      return () => pattern.value();
+    } else {
+      return () => window.mini(pattern).value();
+    }
+  };
+
+  console.log("Strudel loaded!");
+
+  /// ===== End of Hydra-Strudel integration ===== ///
+
+  /*
+
+  SEQUENCER
+
+  */
+
+  window.activeTrackers = new Set();
+
+  // Automatically unregister track objects when GC cleans them up
+  const trackerRegistry = new FinalizationRegistry((ref) => {
+    window.activeTrackers.delete(ref);
+  });
+
+  // Factory Function: track(sequenceCallback, attackSec, minLengthSec, decaySec)
+  window.track = (
+    sequenceCallback,
+    attackSec = 0,
+    minLengthSec = 2,
+    decaySec = 0.01,
+  ) => {
+    let noteStartTime = -Infinity;
+    let activeNoteVal = 0;
+    let prevRawVal = 0;
+    let amp = 0;
+
+    // The callable function returned to Hydra
+    const trackerFunc = () => amp;
+
+    trackerFunc.update = (dtSec) => {
+      const now = performance.now() / 1000;
+
+      const currentPattern = P(sequenceCallback);
+      const rawVal =
+        typeof currentPattern === "function"
+          ? currentPattern()
+          : currentPattern;
+
+      const isNewNote =
+        rawVal > 0 &&
+        (rawVal !== prevRawVal ||
+          (currentPattern.query && currentPattern.query().length > 0));
+
+      if (isNewNote) {
+        noteStartTime = now;
+        activeNoteVal = rawVal;
+        amp = attackSec > 0 ? 0 : activeNoteVal;
+      }
+      prevRawVal = rawVal;
+
+      const elapsed = now - noteStartTime;
+      const isHoldPhase = elapsed < minLengthSec;
+
+      if (elapsed < attackSec && attackSec > 0) {
+        amp = Math.min(activeNoteVal, (elapsed / attackSec) * activeNoteVal);
+      } else if (isHoldPhase) {
+        amp = activeNoteVal;
+      } else {
+        const safeDecaySec = Math.max(0.001, decaySec);
+        amp *= Math.exp((-6.91 * dtSec) / safeDecaySec);
+      }
+    };
+
+    // Register a weak reference to this tracker instance
+    const weakRef = new WeakRef(trackerFunc);
+    window.activeTrackers.add(weakRef);
+    trackerRegistry.register(trackerFunc, weakRef);
+
+    return trackerFunc;
+  };
+  // 2. Tracker Step Engine
+  let lastFrameTime = performance.now() / 1000;
+
+  window.stepTrackers = () => {
+    const now = performance.now() / 1000;
+    const dtSec = now - lastFrameTime;
+    lastFrameTime = now;
+
+    window.activeTrackers.forEach((ref) => {
+      const tracker = ref.deref();
+      if (tracker) {
+        tracker.update(dtSec);
+      } else {
+        window.activeTrackers.delete(ref);
+      }
+    });
+  };
+
+  // 3. Transparent Update Override Interceptor
+  let userDefinedUpdate = () => {};
+
+  Object.defineProperty(window, "update", {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return () => {
+        userDefinedUpdate(); // Run custom code defined in Hydra
+        stepTrackers(); // Run tracker step engine automatically
+      };
+    },
+    set(fn) {
+      if (typeof fn === "function") {
+        userDefinedUpdate = fn;
+      }
+    },
+  });
+
+
 }
