@@ -5,8 +5,9 @@ This repository includes the source code for the framework, scripts for plots,  
 
 
 
-## TODO add videos
-(coming soon, i.e. sept 3)
+![Mono Demo](https://github.com/user-attachments/assets/8529d29c-72fd-4221-a24d-f943e70ab431)
+
+
 
 ## Quick Start
 
