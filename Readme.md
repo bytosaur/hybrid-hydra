@@ -4,10 +4,10 @@ This repository includes the source code for the framework, scripts for plots,  
 
 
 
+<video src="https://github.com/user-attachments/assets/8529d29c-72fd-4221-a24d-f943e70ab431"> </video>
 
-![Mono Demo](https://github.com/user-attachments/assets/8529d29c-72fd-4221-a24d-f943e70ab431)
-
-
+>> Click [here](
+https://okarldr7jlc8kd06.public.blob.vercel-storage.com/videos/HybridHydra_demo.mp4) if the video doesnt play well <<<
 
 ## Quick Start
 
