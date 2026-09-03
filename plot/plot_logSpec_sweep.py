@@ -10,7 +10,7 @@ def format_frequency_label(freq_hz):
         return f"{freq_hz / 1000:g}k"
     return f"{int(freq_hz)}"
 
-def plot_paper_spectrogram(wav_path, save_path="spectrogram.pdf", dpi=300, scale="linear"):
+def plot_paper_spectrogram(wav_path, save_path="spectrogram.pdf", dpi=300):
     """
     Generates a publication-quality spectrogram from a .wav file.
     Saves as vector graphics (PDF) by default for infinite scalability in LaTeX/Word.
@@ -52,7 +52,7 @@ def plot_paper_spectrogram(wav_path, save_path="spectrogram.pdf", dpi=300, scale
         sr=sr, 
         hop_length=hop_length, 
         x_axis="time", 
-        y_axis=scale, 
+        y_axis="log", 
         ax=ax, 
         cmap="magma",
         # vmax=0,       # Sets top of dB scale to 0 (peak)
@@ -118,6 +118,5 @@ if __name__ == "__main__":
     parser.add_argument("wav_path", type=str, help="Path to the input .wav file.")
     parser.add_argument("-s", "--save_path", type=str, default="spectrogram.pdf", help="Path to save the output spectrogram (default: spectrogram.pdf).")
     parser.add_argument("-d", "--dpi", type=int, default=500, help="DPI for the output file (default: 300).")
-    parser.add_argument("-sc", "--scale", type=str, default="linear", choices=["linear", "log", "mel"], help="Scale for the frequency axis (default: linear).")
     args = parser.parse_args()
-    plot_paper_spectrogram(args.wav_path, args.save_path, args.dpi, args.scale)
+    plot_paper_spectrogram(args.wav_path, args.save_path, args.dpi)
